@@ -1,0 +1,17 @@
+{
+  "name": "classificacao-os",
+  "version": "1.0.0",
+  "description": "Sistema de classificação automática de Ordens de Serviço",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js"
+  },
+  "keywords": ["os", "classificacao", "nlp", "excel"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "node-nlp": "^4.27.0"
+  }
+}
