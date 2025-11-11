@@ -45,24 +45,7 @@ Se SERVICO contém "PREVENTIV" → PREVENTIVA (99% confiança)
 Se menos de 2 dias de antecedência → CORRETIVA_PRONTO_ATENDIMENTO (95%)
 Se contém "CORRETIV" + mais de 5 dias → CORRETIVA_PROGRAMADA (90%)
 Caso contrário → NLP analisa o contexto completo
-📁 Estrutura de Arquivos
-meu-projeto-classificacao/
-├── package.json
-├── README.md
-├── src/
-│   ├── index.js                    ← ARQUIVO PRINCIPAL
-│   ├── services/
-│   │   ├── excelReader.js          ← Lê Excel
-│   │   ├── preprocessor.js         ← Algoritmo
-│   │   └── classifier.js           ← IA/NLP
-│   └── utils/
-│       └── excelWriter.js          ← Salva Excel
-├── data/
-│   ├── input/
-│   │   └── ordens_servico.xlsx     ← COLOQUE SUA PLANILHA AQUI
-│   └── output/
-│       └── (resultados gerados)
-└── node_modules/
+
 📈 Exemplo de Saída
 🚀 Iniciando classificação de Ordens de Serviço...
 
