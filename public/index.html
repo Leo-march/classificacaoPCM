@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classificador de Ordens de Serviço</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+      max-width: 600px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #666;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .upload-area {
+      border: 3px dashed #667eea;
+      border-radius: 15px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: #f8f9ff;
+    }
+
+    .upload-area:hover {
+      border-color: #764ba2;
+      background: #f0f1ff;
+    }
+
+    .upload-area.dragover {
+      border-color: #764ba2;
+      background: #e8e9ff;
+      transform: scale(1.02);
+    }
+
+    .upload-icon {
+      font-size: 60px;
+      margin-bottom: 15px;
+    }
+
+    .upload-text {
+      color: #667eea;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .upload-hint {
+      color: #999;
+      font-size: 14px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .file-info {
+      display: none;
+      margin-top: 20px;
+      padding: 15px;
+      background: #e8f5e9;
+      border-radius: 10px;
+      border-left: 4px solid #4caf50;
+    }
+
+    .file-info.show {
+      display: block;
+    }
+
+    .file-name {
+      font-weight: 600;
+      color: #2e7d32;
+      margin-bottom: 5px;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 20px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .loading.show {
+      display: block;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .resultado {
+      display: none;
+      margin-top: 30px;
+      padding: 20px;
+      background: #f0f7ff;
+      border-radius: 15px;
+      border-left: 4px solid #2196f3;
+    }
+
+    .resultado.show {
+      display: block;
+    }
+
+    .resultado h3 {
+      color: #1976d2;
+      margin-bottom: 15px;
+      font-size: 20px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      color: #333;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .resumo-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .resumo-item:last-child {
+      border-bottom: none;
+    }
+
+    .btn-download {
+      background: #4caf50;
+      color: white;
+    }
+
+    .btn-download:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+    }
+
+    .erro {
+      display: none;
+      margin-top: 20px;
+      padding: 15px;
+      background: #ffebee;
+      border-radius: 10px;
+      border-left: 4px solid #f44336;
+      color: #c62828;
+    }
+
+    .erro.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 Classificador de OS</h1>
+    <p class="subtitle">Sistema inteligente de classificação de Ordens de Serviço</p>
+
+    <div class="upload-area" id="uploadArea">
+      <div class="upload-icon">📤</div>
+      <div class="upload-text">Arraste seu arquivo aqui</div>
+      <div class="upload-hint">ou clique para selecionar (apenas .xlsx)</div>
+      <input type="file" id="fileInput" accept=".xlsx">
+    </div>
+
+    <div class="file-info" id="fileInfo">
+      <div class="file-name" id="fileName"></div>
+      <div>✓ Arquivo pronto para processar</div>
+    </div>
+
+    <button class="btn btn-primary" id="btnProcessar" disabled>
+      Processar Planilha
+    </button>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div>Processando ordens de serviço...</div>
+      <div style="color: #999; font-size: 14px; margin-top: 5px;">Isso pode levar alguns segundos</div>
+    </div>
+
+    <div class="erro" id="erro"></div>
+
+    <div class="resultado" id="resultado">
+      <h3>✅ Processamento Concluído!</h3>
+      
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total de OS</div>
+          <div class="stat-value" id="totalOS">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Confiança Média</div>
+          <div class="stat-value" id="confiancaMedia">0%</div>
+        </div>
+      </div>
+
+      <h4 style="margin-bottom: 10px; color: #666;">Resumo da Classificação:</h4>
+      <div id="resumoContainer"></div>
+
+      <button class="btn btn-download" id="btnDownload">
+        ⬇️ Baixar Planilha Classificada
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const btnProcessar = document.getElementById('btnProcessar');
+    const loading = document.getElementById('loading');
+    const resultado = document.getElementById('resultado');
+    const erro = document.getElementById('erro');
+    
+    let arquivoSelecionado = null;
+    let arquivoDownload = null;
+
+    // Click na área de upload
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    // Drag and drop
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        handleFile(files[0]);
+      }
+    });
+
+    // Seleção de arquivo
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    function handleFile(file) {
+      if (!file.name.endsWith('.xlsx')) {
+        mostrarErro('Por favor, selecione um arquivo .xlsx válido!');
+        return;
+      }
+
+      arquivoSelecionado = file;
+      fileName.textContent = file.name;
+      fileInfo.classList.add('show');
+      btnProcessar.disabled = false;
+      resultado.classList.remove('show');
+      erro.classList.remove('show');
+    }
+
+    // Processar arquivo
+    btnProcessar.addEventListener('click', async () => {
+      if (!arquivoSelecionado) return;
+
+      const formData = new FormData();
+      formData.append('arquivo', arquivoSelecionado);
+
+      btnProcessar.disabled = true;
+      loading.classList.add('show');
+      resultado.classList.remove('show');
+      erro.classList.remove('show');
+
+      try {
+        const response = await fetch('/processar', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.erro || 'Erro ao processar arquivo');
+        }
+
+        // Mostrar resultado
+        document.getElementById('totalOS').textContent = data.total;
+        document.getElementById('confiancaMedia').textContent = data.confiancaMedia + '%';
+        
+        // Montar resumo
+        const resumoContainer = document.getElementById('resumoContainer');
+        resumoContainer.innerHTML = '';
+        
+        Object.entries(data.resumo).forEach(([tipo, quantidade]) => {
+          const percentual = ((quantidade / data.total) * 100).toFixed(1);
+          const item = document.createElement('div');
+          item.className = 'resumo-item';
+          item.innerHTML = `
+            <span><strong>${tipo}</strong></span>
+            <span>${quantidade} (${percentual}%)</span>
+          `;
+          resumoContainer.appendChild(item);
+        });
+
+        arquivoDownload = data.arquivoDownload;
+        resultado.classList.add('show');
+
+      } catch (err) {
+        mostrarErro(err.message);
+      } finally {
+        loading.classList.remove('show');
+        btnProcessar.disabled = false;
+      }
+    });
+
+    // Download
+    document.getElementById('btnDownload').addEventListener('click', () => {
+      if (arquivoDownload) {
+        window.location.href = `/download/${arquivoDownload}`;
+      }
+    });
+
+    function mostrarErro(mensagem) {
+      erro.textContent = '❌ ' + mensagem;
+      erro.classList.add('show');
+    }
+  </script>
+</body>
+</html>
