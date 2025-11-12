@@ -32,7 +32,70 @@ async function inicializarNLP() {
   
   const manager = new NlpManager({ languages: ['pt'], forceNER: true });
   
-  // TREINAR: PREVENTIVAS
+  // CARREGAR training-data.json
+  const trainingPath = path.join(__dirname, 'training-data.json');
+  
+  if (!fs.existsSync(trainingPath)) {
+    console.error('❌ ERRO: training-data.json não encontrado!');
+    console.log('   Usando treinamento padrão limitado...');
+    return await treinarPadrao(manager);
+  }
+  
+  try {
+    const trainingData = JSON.parse(fs.readFileSync(trainingPath, 'utf-8'));
+    
+    console.log('\n📚 Carregando dados de treinamento do training-data.json:');
+    
+    let totalExemplos = 0;
+    
+    // TREINAR: PREVENTIVAS
+    if (trainingData.preventiva) {
+      trainingData.preventiva.forEach(doc => {
+        manager.addDocument('pt', doc, 'preventiva');
+      });
+      console.log(`   ✅ PREVENTIVA: ${trainingData.preventiva.length} exemplos`);
+      totalExemplos += trainingData.preventiva.length;
+    }
+    
+    // TREINAR: CORRETIVA PROGRAMADA
+    if (trainingData.corretiva_programada) {
+      trainingData.corretiva_programada.forEach(doc => {
+        manager.addDocument('pt', doc, 'corretiva_programada');
+      });
+      console.log(`   ✅ CORRETIVA_PROGRAMADA: ${trainingData.corretiva_programada.length} exemplos`);
+      totalExemplos += trainingData.corretiva_programada.length;
+    }
+    
+    // TREINAR: PREDITIVA (se existir)
+    if (trainingData.preditiva) {
+      trainingData.preditiva.forEach(doc => {
+        manager.addDocument('pt', doc, 'preditiva');
+      });
+      console.log(`   ✅ PREDITIVA: ${trainingData.preditiva.length} exemplos`);
+      totalExemplos += trainingData.preditiva.length;
+    }
+    
+    await manager.train();
+    manager.save();
+    
+    console.log('\n✅ Modelo NLP treinado com sucesso!');
+    console.log(`   📊 Total de exemplos: ${totalExemplos}`);
+    console.log('   📁 Fonte: training-data.json\n');
+    
+    nlpReady = true;
+    return manager;
+    
+  } catch (err) {
+    console.error('❌ Erro ao carregar training-data.json:', err.message);
+    console.log('   Usando treinamento padrão limitado...');
+    return await treinarPadrao(manager);
+  }
+}
+
+// Fallback: treinamento padrão (caso training-data.json não exista)
+async function treinarPadrao(manager) {
+  console.log('\n⚠️  Usando treinamento padrão (limitado)...');
+  
   const preventivas = [
     'preventiva manutencao periodica',
     'inspecao programada equipamento',
@@ -57,11 +120,6 @@ async function inicializarNLP() {
     'revisao equipamento'
   ];
   
-  preventivas.forEach(doc => manager.addDocument('pt', doc, 'preventiva'));
-  
-  // CORRETIVA PRONTO ATENDIMENTO - REMOVIDO (não treinar)
-  
-  // TREINAR: CORRETIVA PROGRAMADA
   const programadas = [
     'corretiva programada reparo',
     'manutencao corretiva agendada',
@@ -80,14 +138,14 @@ async function inicializarNLP() {
     'reparar defeito'
   ];
   
+  preventivas.forEach(doc => manager.addDocument('pt', doc, 'preventiva'));
   programadas.forEach(doc => manager.addDocument('pt', doc, 'corretiva_programada'));
   
   await manager.train();
   manager.save();
   
-  console.log('✅ Modelo NLP treinado com sucesso!');
   console.log(`   - ${preventivas.length} exemplos de PREVENTIVA`);
-  console.log(`   - ${programadas.length} exemplos de PROGRAMADA`);
+  console.log(`   - ${programadas.length} exemplos de PROGRAMADA\n`);
   
   nlpReady = true;
   return manager;
@@ -147,7 +205,7 @@ function calcularDiasAntecedencia(dtInicio, previstoInicio) {
 async function classificarOS(os, index) {
   console.log(`\n📋 Classificando OS ${index + 1}:`);
   
-  // Extrair campos (testar várias possibilidades de nomes de colunas)
+  // Extrair campos
   const servicoRaw = os['SERVICO'] || os['Servico'] || os['DESCRIÇÃO'] || os['Descrição'] || os['Serviço'] || '';
   const nomeBem = os['Nome do Bem'] || os['NOME DO BEM'] || '';
   const linha = os['Linha'] || os['LINHA'] || '';
@@ -162,7 +220,7 @@ async function classificarOS(os, index) {
     return { tipo: 'REVISAR', confianca: 0 };
   }
   
-  // PASSO 2: Detectar PREVENTIVA (case insensitive, mantendo acentos)
+  // PASSO 2: Detectar PREVENTIVA
   const servicoStr = servicoRaw.toString();
   const temPreventiva = /preventiv/i.test(servicoStr);
   const temCorretiva = /corretiv/i.test(servicoStr);
@@ -183,7 +241,6 @@ async function classificarOS(os, index) {
   
   console.log(`   Dias de antecedência: ${diasAntecedencia}`);
   
-  // Corretiva programada (com antecedência)
   if (temCorretiva && diasAntecedencia > 0) {
     console.log('   ✅ REGRA: Corretiva programada detectada');
     return { tipo: 'CORRETIVA_PROGRAMADA', confianca: 90 };
@@ -206,13 +263,13 @@ async function classificarOS(os, index) {
     
     const mapeamento = {
       'preventiva': 'PREVENTIVA',
-      'corretiva_programada': 'CORRETIVA_PROGRAMADA'
+      'corretiva_programada': 'CORRETIVA_PROGRAMADA',
+      'preditiva': 'PREDITIVA'
     };
     
     const tipo = mapeamento[resultado.intent] || 'REVISAR';
     const confianca = Math.round((resultado.score || 0) * 100);
     
-    // Se confiança muito baixa ou intent None
     if (confianca < 35 || !resultado.intent || resultado.intent === 'None') {
       console.log('   ⚠️ Confiança muito baixa ou intent indefinido');
       return { tipo: 'REVISAR', confianca };
@@ -250,31 +307,27 @@ app.post('/processar', upload.single('arquivo'), async (req, res) => {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     let dados = XLSX.utils.sheet_to_json(sheet);
 
-    console.log(`✅ ${dados.length} linhas encontradas (incluindo cabeçalho)`);
+    console.log(`✅ ${dados.length} linhas encontradas`);
 
     if (dados.length === 0) {
       fs.unlinkSync(req.file.path);
       return res.status(400).json({ erro: 'Planilha vazia ou formato inválido' });
     }
 
-    // Verificar se a primeira linha é o cabeçalho
+    // Verificar e corrigir cabeçalho
     const primeiraLinha = dados[0];
     const colunasDetectadas = Object.keys(primeiraLinha);
     
     console.log('\n📊 Colunas detectadas:', colunasDetectadas.join(', '));
     
-    // Se as colunas são __EMPTY, __EMPTY_1, etc., a primeira linha é o cabeçalho real
     if (colunasDetectadas.some(col => col.includes('__EMPTY'))) {
       console.log('⚠️ Detectado que a primeira linha contém o cabeçalho real');
       
-      // Usar a primeira linha como cabeçalho
       const novoCabecalho = Object.values(primeiraLinha);
       console.log('📋 Novo cabeçalho:', novoCabecalho.join(', '));
       
-      // Remover a primeira linha (cabeçalho)
       dados = dados.slice(1);
       
-      // Renomear as colunas
       dados = dados.map(linha => {
         const novaLinha = {};
         Object.keys(linha).forEach((chave, index) => {
@@ -287,17 +340,7 @@ app.post('/processar', upload.single('arquivo'), async (req, res) => {
       console.log(`✅ Dados reorganizados: ${dados.length} linhas de dados`);
     }
 
-    // Mostrar colunas disponíveis
-    console.log('\n📊 Colunas detectadas:', Object.keys(dados[0]).join(', '));
-    
-    // Mostrar primeiras 3 linhas completas para debug
-    console.log('\n📝 EXEMPLO DAS PRIMEIRAS 3 LINHAS:');
-    dados.slice(0, 3).forEach((linha, i) => {
-      console.log(`\nLinha ${i + 1}:`);
-      Object.entries(linha).forEach(([chave, valor]) => {
-        console.log(`  ${chave}: "${valor}"`);
-      });
-    });
+    console.log('\n📊 Colunas finais:', Object.keys(dados[0]).join(', '));
 
     const resultados = [];
     const resumo = {};
@@ -315,7 +358,6 @@ app.post('/processar', upload.single('arquivo'), async (req, res) => {
         Confianca: classificacao.confianca + '%'
       });
 
-      // Contabilizar para resumo
       resumo[classificacao.tipo] = (resumo[classificacao.tipo] || 0) + 1;
       somaConfianca += classificacao.confianca;
     }
@@ -340,7 +382,6 @@ app.post('/processar', upload.single('arquivo'), async (req, res) => {
 
     console.log(`💾 Arquivo salvo: ${nome}`);
 
-    // Limpar arquivo temporário
     fs.unlinkSync(req.file.path);
 
     const confiancaMedia = Math.round(somaConfianca / dados.length);
